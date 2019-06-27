@@ -122,28 +122,30 @@ trace_hist_mod = function(p, data_input, var){
   
   fill_labels = p$data %>%
     filter( x == var) %>%
-    select(fill, value, fill_value) %>%
-    mutate( rwn = as.numeric(fill) ) %>%
+    select( value, fill_value) %>%
     distinct() %>%
-    arrange(rwn)  
+    arrange( desc(value) ) %>%
+    mutate( line_at = lines_at) %>%
+    rename( label = value
+            , color = fill_value )
   
-  colors = p$data$fill_value %>% unique()
-  colors = colors[! colors %in% p$data$fill_flow ]
-  
-  
-  
-  trace_vlines = map2(lines_at, colors, function(x,c) list( x0 = x
+
+  trace_vlines = fill_labels %>%
+    mutate( trace = pmap(list(label, color, line_at)
+                         , function(l, c, lin) list( x0 = lin
                                        , y0 = 0
-                                       , x1 = x
+                                       , x1 = lin
                                        , y1 = max(y_var)
                                        , line = list( color = c)
                                        , showlegend = F
-                                       , name = paste0( var,'_line',which(vars == var) )
+                                       , name = paste0( var,'_' ,l )
                                        , xaxis = paste0( 'x', which(vars == var) )
-                                       , yaxis = paste0( 'y', which(vars == var) ) 
-  ) )
-  
-  names(trace_vlines) <- paste0( var,'_line', seq(1, length(lines_at),1) )
+                                       , yaxis = paste0( 'y', which(vars == var) ) ) )
+      ) %>%
+      .$trace
+    
+
+  names(trace_vlines) <- paste0( var,'_', fill_labels$label )
   
   traces = append(trace_var, trace_vlines)
   
@@ -382,8 +384,11 @@ create_layout_hist = function(trace_hist, lim_up = 0.9, lim_right = 1, space = 0
 map_trace = function(p, trace_hist){
   
   df = p$data %>%
-    mutate(trace_number = map2_int(x, value, function(x,y) which(names(trace_hist) == paste0(x, '_', y) ) )
-           , type = map_chr(trace_number, ~ trace_hist[[.]][['type']] )
+    mutate( x_value = map2_chr(x, value, function(x,y) paste0(x,'_' ,y) )
+            , trace_number = map(x_value, ~ which(names(trace_hist) == . ) )
+            , trace_number = map_int(trace_number, ~ ifelse( is_empty(.), NA, .)  ) ) %>%
+    filter( ! is.na(trace_number) ) %>%
+    mutate( type = map_chr(trace_number, ~ trace_hist[[.]][['type']] ) )
            , color = map_chr(trace_number, ~ trace_hist[[.]][['marker']][['color']]) ) %>%
     select(alluvial_id, trace_number, type, color) %>%
     group_by(alluvial_id) %>%
