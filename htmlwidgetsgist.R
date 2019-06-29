@@ -12,3 +12,4 @@ shim_system_file("htmltools")
 # When the JS or CSS resources of the package are edited, they'll immediately
 # be available, without having to build and install the package.
 devtools::load_all()
+

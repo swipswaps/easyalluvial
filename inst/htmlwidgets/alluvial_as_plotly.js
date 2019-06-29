@@ -21,19 +21,36 @@ HTMLWidgets.widget({
     var layout = [];
     var myPlot = document.getElementById(el.id);
     
+    // x.traces is passed as an Object with named elements
+    // but needs to be converted to array with unnamed elements
     for( var key of Object.keys(x.traces)){
       data.push( x.traces[key] );
     }
     
       
     layout = x.layout;
+    
+    var shapes = [];
+    
+    for( var key of Object.keys(x.shapes)){
+      shapes.push( x.shapes[key] );
+    }
+    
+    var shapes_original = [];
+    
+    for( var key of Object.keys(x.shapes_original)){
+      shapes_original.push( x.shapes_original[key] );
+    }
+    
+    layout['shapes'] = shapes;
 
-    Plotly.plot(el.id, data, x.layout);
+    Plotly.plot(el.id, data, layout);
     
     myPlot.on('plotly_hover', function(data){
       
       var curve = data.points[0].curveNumber;
       
+      // curve == 0, is the parcats trace
       if(  curve == 0 ){
       
         for ( var i_data in data.points){
@@ -58,12 +75,23 @@ HTMLWidgets.widget({
                                       }
                              , parseInt(x.map_curve[point][i]) );
             }
+
+            if( x.map_type[point][i] == 'line'){
+              
+              tr = x.map_curve[point][i];
+              shape_index = x.map_trace_2_shape[tr -1];
+              
+              shapes[shape_index]['line']['color'] = x.parcats_cols[point];
             
+            }
+
           }
         
         }
       }
-
+      if(curve == 0){
+        Plotly.relayout(el.id, { shapes : shapes } );
+      }
     });
     
     myPlot.on('plotly_unhover', function(data){
@@ -93,12 +121,13 @@ HTMLWidgets.widget({
                                       }
                                       , parseInt(x.map_curve[point][i]) );
             }
+            
           }
         
         }
       }
 
-
+      Plotly.relayout(el.id, { shapes : shapes_original } );
     });
 
   }

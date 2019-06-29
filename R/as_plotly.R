@@ -136,11 +136,12 @@ trace_hist_mod = function(p, data_input, var){
                                        , y0 = 0
                                        , x1 = lin
                                        , y1 = max(y_var)
+                                       , type = 'line'
                                        , line = list( color = c)
                                        , showlegend = F
                                        , name = paste0( var,'_' ,l )
-                                       , xaxis = paste0( 'x', which(vars == var) )
-                                       , yaxis = paste0( 'y', which(vars == var) ) ) )
+                                       , xref = paste0( 'x', which(vars == var) )
+                                       , yref = paste0( 'y', which(vars == var) ) ) )
       ) %>%
       .$trace
     
@@ -212,34 +213,48 @@ trace_hist_cat = function(p, data_input, var){
   
   p_hist = plot_hist(var = var, p = p, data_input = data_input)
   
-  df = p_hist$data
+  df_label = p$data %>%
+    filter( x == var ) %>%
+    mutate( value = fct_drop(value) ) %>%
+    select( value ) %>%
+    distinct() %>%
+    arrange( desc(value) ) %>%
+    mutate( rwn = row_number() )
+  
+  if( var %in% names(p_hist$data) ){
+    # is the case for model response
+    df = p_hist$data %>%
+      mutate( rwn = as.integer( !! as.name(var) ) ) %>%
+      left_join( df_label, by = 'rwn') %>%
+      rename( var_key = !! as.name(var) )
+  }else{
+    df = p_hist$data %>%
+      mutate( var_key = as.factor(var_key)
+              , rwn = as.integer( var_key ) ) %>%
+      left_join( df_label, by = 'rwn')
+  }
   
   lvl = levels(df[[var]])
   
   vars = p$data$x %>% levels
   
-  if(p$alluvial_type == 'model_response'){
-    df = df %>%
-      rename( var_key = !! as.name(var) )
-  }
-  
   df = df %>%
     mutate( var_key = fct_relevel(var_key, lvl) ) %>%
-    group_by(var_key, fill_value) %>%
+    group_by(var_key, fill_value, value) %>%
     count() %>%
     arrange(var_key) %>%
     mutate(trace = list( list( x = list(var_key)
                         , y = list(n)
                         , type = 'bar'
-                        , marker = list(color = fill_value)
+                        , marker = list(color = as.character(fill_value) )
                         , showlegend = FALSE
                         # , width = 0.5
-                        , name = paste0(var, '_', var_key)
+                        , name = paste0(var, '_', value)
                         , xaxis = paste0( 'x', which(vars == var) )
                         , yaxis = paste0( 'y', which(vars == var) ) ) ) )
   traces = df$trace
   
-  names(traces) <- paste0( var, '_', df$var_key)
+  names(traces) <- paste0( var, '_', df$value)
   
   return(traces)
 }
@@ -388,8 +403,12 @@ map_trace = function(p, trace_hist){
             , trace_number = map(x_value, ~ which(names(trace_hist) == . ) )
             , trace_number = map_int(trace_number, ~ ifelse( is_empty(.), NA, .)  ) ) %>%
     filter( ! is.na(trace_number) ) %>%
-    mutate( type = map_chr(trace_number, ~ trace_hist[[.]][['type']] ) )
-           , color = map_chr(trace_number, ~ trace_hist[[.]][['marker']][['color']]) ) %>%
+    mutate( type = map_chr(trace_number, ~ trace_hist[[.]][['type']] ) 
+           , color_marker = map(trace_number, ~ trace_hist[[.]][['marker']][['color']] )
+           , color_line = map(trace_number, ~ trace_hist[[.]][['line']][['color']] )
+           , color = ifelse( type == 'line', color_line, color_marker)
+           , color = map_chr(color, ~ . )
+           ) %>%
     select(alluvial_id, trace_number, type, color) %>%
     group_by(alluvial_id) %>%
     nest() %>%
@@ -411,6 +430,26 @@ map_trace = function(p, trace_hist){
                 , map_type = map_type
                 , map_color = map_color) )
   
+}
+
+get_shapes = function(traces, layout){
+  
+  types = map_chr(traces, ~ .$type) %>%
+    unname()
+  
+  lines_index = which(types == 'line')
+  
+  shapes =  traces[lines_index] 
+  
+  map_trace_2_shape = tibble( trace_index = seq(1, length(traces) ) ) %>%
+    mutate( shape_index = map( trace_index, ~ which(lines_index == .) ) 
+            , shape_index = map_int( shape_index, ~ ifelse( is_empty(.), as.integer(0), .) )  
+            )
+  
+  ls_shapes = list( map_trace_2_shape = map_trace_2_shape$shape_index
+                    , shapes = shapes)
+  
+  return(ls_shapes)
 }
 
 #' <Add Title>
@@ -449,6 +488,9 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
     layout_hist = create_layout_hist(trace_hist)
     layout_rug = create_layout_rug(trace_rugs, layout_hist)
     layout = append(layout_hist, layout_rug)
+    ls_shapes = get_shapes(traces, layout)
+    shapes = ls_shapes$shapes
+    map_trace_2_shape = ls_shapes$map_trace_2_shape
     ls_map = map_trace(p, trace_hist)
     map_curve = ls_map$map_curve
     map_type = ls_map$map_type
@@ -458,6 +500,8 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
     trace_hist = list()
     traces = list(parcats = parcats)
     layout = list()
+    shapes = list()
+    map_trace_2_shape = list()
     map_curve = list()
     map_type = list()
     map_color = list()
@@ -466,7 +510,12 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
   
   x = list( traces = traces
             , layout = layout
+            , shapes = shapes
+            # JS does not make copies of variables thus we pass one to
+            # change and one to keep. 
+            , shapes_original = shapes
             , map_curve = map_curve %>% unname()
+            , map_trace_2_shape = map_trace_2_shape
             , map_type = map_type %>% unname()
             , map_color = map_color %>% unname()
             , parcats_cols = parcats$line$color
