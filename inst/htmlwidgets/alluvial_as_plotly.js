@@ -48,6 +48,10 @@ HTMLWidgets.widget({
     
     myPlot.on('plotly_hover', function(data){
       
+      // this is the proper way too deepcopy object in JS
+      // before I was passing two versions of the same object
+      shapes = JSON.parse(JSON.stringify(shapes_original));
+      
       var curve = data.points[0].curveNumber;
       
       // curve == 0, is the parcats trace
@@ -79,9 +83,10 @@ HTMLWidgets.widget({
             if( x.map_type[point][i] == 'line'){
               
               tr = x.map_curve[point][i];
+              
               shape_index = x.map_trace_2_shape[tr -1];
               
-              shapes[shape_index]['line']['color'] = x.parcats_cols[point];
+              shapes[shape_index -1 ]['line']['color'] = x.parcats_cols[point];
             
             }
 
@@ -89,8 +94,17 @@ HTMLWidgets.widget({
         
         }
       }
+      
+      var t1 = curve
+      , t2 = data.points[0].pointNumber
+      , t3 = x.map_type[t2]
+      , t4 = x.map_curve[t2]
+      ;
+      var title = t1 + '_' + t2 + '_' + t3 + '_' + t4 + '_' + x.map_trace_2_shape[12]+ '_' + x.map_trace_2_shape[15];
+
       if(curve == 0){
-        Plotly.relayout(el.id, { shapes : shapes } );
+        Plotly.relayout(el.id, { shapes : shapes
+                                , title : title} );
       }
     });
     
@@ -127,7 +141,8 @@ HTMLWidgets.widget({
         }
       }
 
-      Plotly.relayout(el.id, { shapes : shapes_original } );
+      Plotly.relayout(el.id, { shapes : shapes_original
+                                , title : ''} );
     });
 
   }

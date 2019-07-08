@@ -172,7 +172,8 @@ trace_hist_num = function(p, data_input, var){
       select(fill, value, fill_value) %>%
       mutate( rwn = as.numeric(fill) ) %>%
       distinct() %>%
-      arrange(rwn)
+      arrange( desc(rwn) ) %>%
+      mutate( rwn = row_number() )
     
     
     df = df %>%
@@ -273,6 +274,7 @@ trace_parcats = function(p
               , value_str = ifelse( x != 'pred', str_split(value_str, '\\\n'), value_str)
               , value_str = map_chr(value_str, 1)
               , value_str = as_factor(value_str)
+              , value_str = fct_rev(value_str)
               , value = value_str) %>%
       select( - value_str)
   }else{
@@ -432,7 +434,7 @@ map_trace = function(p, trace_hist){
   
 }
 
-get_shapes = function(traces, layout){
+get_shapes = function(traces){
   
   types = map_chr(traces, ~ .$type) %>%
     unname()
@@ -488,7 +490,7 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
     layout_hist = create_layout_hist(trace_hist)
     layout_rug = create_layout_rug(trace_rugs, layout_hist)
     layout = append(layout_hist, layout_rug)
-    ls_shapes = get_shapes(traces, layout)
+    ls_shapes = get_shapes(trace_hist)
     shapes = ls_shapes$shapes
     map_trace_2_shape = ls_shapes$map_trace_2_shape
     ls_map = map_trace(p, trace_hist)
