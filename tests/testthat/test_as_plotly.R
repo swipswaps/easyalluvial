@@ -64,4 +64,22 @@ test_that('as_plotly_alluvial_model_response'
     
     alluvial_as_plotly(p, marginal_histograms = T, data_input = df)
     
+    # categorical response ---------------------------
+    
+    df = titanic %>%
+      select_if(is.factor)
+    
+    set.seed(0)
+    m = randomForest::randomForest( Survived ~ ., df)
+    imp = m$importance
+    
+    expect_warning( {dspace = get_data_space(df, imp, degree = 3, max_levels = 5)} )
+    
+    expect_true( nrow(dspace) == 30 )
+    
+    pred = predict(m, newdata = dspace,type = 'response')
+    p = alluvial_model_response(pred, dspace, imp, degree = 3)
+    
+    alluvial_as_plotly(p, marginal_histograms = T, data_input = df)
+    
 })

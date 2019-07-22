@@ -137,7 +137,7 @@ trace_hist_mod = function(p, data_input, var){
                                        , x1 = lin
                                        , y1 = max(y_var)
                                        , type = 'line'
-                                       , line = list( color = c)
+                                       , line = list( color = 'lightgrey')
                                        , showlegend = F
                                        , name = paste0( var,'_' ,l )
                                        , xref = paste0( 'x', which(vars == var) )
@@ -223,7 +223,7 @@ trace_hist_cat = function(p, data_input, var){
     mutate( rwn = row_number() )
   
   if( var %in% names(p_hist$data) ){
-    # is the case for model response
+    # is the case for model response 
     df = p_hist$data %>%
       mutate( rwn = as.integer( !! as.name(var) ) ) %>%
       left_join( df_label, by = 'rwn') %>%
