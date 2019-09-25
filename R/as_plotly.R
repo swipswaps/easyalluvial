@@ -223,12 +223,22 @@ trace_hist_cat = function(p, data_input, var){
     mutate( rwn = row_number() )
   
   if( var %in% names(p_hist$data) ){
-    # is the case for model response 
+    # categorical variables from model response plots
     df = p_hist$data %>%
       mutate( rwn = as.integer( !! as.name(var) ) ) %>%
       left_join( df_label, by = 'rwn') %>%
       rename( var_key = !! as.name(var) )
+  }else if( var == 'pred' ){
+    df = p_hist$data %>%
+      filter( variable == 'pred') %>%
+      mutate( var_key = value
+              , pred = value ) %>%
+      ungroup() %>%
+      select(var_key, fill_value, value, n) %>%
+      uncount(n)
+    
   }else{
+    # categorical variables from regular alluvial plots
     df = p_hist$data %>%
       mutate( var_key = as.factor(var_key)
               , rwn = as.integer( var_key ) ) %>%
