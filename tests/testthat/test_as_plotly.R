@@ -64,6 +64,8 @@ test_that('as_plotly_alluvial_model_response'
     
     alluvial_as_plotly(p, marginal_histograms = T, data_input = df)
     
+    # grid = add_marginal_histograms(p, df)
+    
     # categorical response ---------------------------
     
     df = titanic %>%
@@ -80,6 +82,10 @@ test_that('as_plotly_alluvial_model_response'
     pred = predict(m, newdata = dspace,type = 'response')
     p = alluvial_model_response(pred, dspace, imp, degree = 3)
     
+    alluvial_as_plotly(p, marginal_histograms = F)
+    
     alluvial_as_plotly(p, marginal_histograms = T, data_input = df)
+    
+    # grid = add_marginal_histograms(p, df)
     
 })

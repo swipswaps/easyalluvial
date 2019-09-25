@@ -414,6 +414,7 @@ map_trace = function(p, trace_hist){
     select(alluvial_id, trace_number, type, color) %>%
     group_by(alluvial_id) %>%
     nest() %>%
+    ungroup() %>%
     mutate(trace_number = map(data, 'trace_number')
            , type = map(data, 'type')
            , color = map(data, 'color')
