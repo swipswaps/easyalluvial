@@ -82,6 +82,7 @@ trace_rug = function(p, data_input, var){
 }
 
 trace_hist_mod = function(p, data_input, var){
+  # creates densitiy histogram with line markers for model response
   
   p_hist = plot_hist(var = var, p = p, data_input = data_input)
   
@@ -270,6 +271,44 @@ trace_hist_cat = function(p, data_input, var){
   return(traces)
 }
 
+trace_imp = function(p, data_input, truncate_at = 50, color = 'darkgrey'){
+  
+  p_imp = plot_imp(p, data_input, truncate_at, color )
+  
+  df = p_imp$data
+  
+  if( ! 'const_values' %in% names(df) ){
+    df$const_values = NA
+  }
+  
+  df = df %>%
+    mutate_if( is.factor, as.character ) %>%
+    arrange( perc ) %>%
+    mutate( fill = ifelse(plotted == 'n', 'lightgrey', color)
+            , method = p$alluvial_params$method 
+            , text = case_when( plotted == 'y' ~ 'alluvial'
+                                , method == 'pdp' ~ 'pdp'
+                                , T ~ paste('fixed:', const_values) ) ) %>%
+    group_by(vars, perc) %>%
+    mutate( trace = list( list( y = list(vars)
+                          , x = list(perc)
+                          , type = 'bar'
+                          , marker = list( color = fill  )
+                          , showlegend = FALSE
+                          , width = 0.5
+                          , name = text
+                          , xaxis = 'x99'
+                          , yaxis = 'y99'
+                          , orientation = 'h'
+                          ) ) ) 
+  
+  traces = df$trace
+  
+  names(traces) <- paste0( 'imp_', df$vars)
+  
+  return(traces)
+}
+
 
 trace_parcats = function(p
                          , domain
@@ -355,7 +394,14 @@ create_layout_rug = function(trace_rugs, layout_hist, offset = 0.01){
   return(layout)
 }
 
-create_layout_hist = function(trace_hist, lim_up = 0.9, lim_right = 1, space = 0.025){
+create_layout_hist = function(trace_hist
+                              , lim_up = 0.9
+                              , lim_right = 1
+                              , space = 0.025
+                              ){
+  
+  
+  lim_right = ifelse( lim_right == 1, 1, lim_right - 0.05 )
   
   yaxis = map(trace_hist, 'yaxis') %>% unique() %>% unlist %>% sort()
   xaxis = map(trace_hist, 'xaxis') %>% unique() %>% unlist %>% sort()
@@ -364,7 +410,7 @@ create_layout_hist = function(trace_hist, lim_up = 0.9, lim_right = 1, space = 0
   
   spaces = map(coord_x, ~ c(.-space/2, .+space/2) ) %>% unlist() 
   
-  coord_x = c(0, spaces[3:(length(spaces)-2) ], 1)
+  coord_x = c(0, spaces[3:(length(spaces)-2) ], lim_right)
   
   layout = list()
   
@@ -473,19 +519,37 @@ get_shapes = function(traces){
 #'
 #' @export
 alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
+                               , imp = T
                                , width = NULL, height = NULL, elementId = NULL
                                , hoveron = 'color'
                                , hoverinfo = 'count+probability'
-                               , labelfont = list( size = 36 )) {
+                               , labelfont = list( size = 36 )
+                               , offset_marginal_histograms = 0.8
+                               , offset_imp = 0.9
+                               ) {
 
   if(marginal_histograms & is.null(data_input) ){
     stop('data_input required if marginal_histograms == TRUE')
+  }
+  
+  if( imp == T & is.null(data_input) & p$alluvial_type == 'model_response' ){
+    stop('data_input required if imp == TRUE')
+  }else if(p$alluvial_type != 'model_response' | ! imp ){
+    imp = F
+    offset_imp = 1
   }
   
   if(marginal_histograms){
     domain = list(y = c(0, 0.7))
   }else{
     domain = list( y = c(0, 1) )
+  }
+  
+  if( imp & p$alluvial_type == 'model_response' ){
+    domain$x = c(0, offset_imp - 0.05 )
+    traces_imp = trace_imp(p, data_input, truncate_at = 50, color = 'darkgrey')
+  }else{
+    traces_imp = list()
   }
   
   parcats = trace_parcats(p, domain = domain
@@ -498,7 +562,7 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
     trace_rugs = trace_rug_all(p, data_input)
     traces = append( list(parcats = parcats), trace_hist) 
     traces = append( traces, trace_rugs )
-    layout_hist = create_layout_hist(trace_hist)
+    layout_hist = create_layout_hist(trace_hist, lim_right = offset_imp)
     layout_rug = create_layout_rug(trace_rugs, layout_hist)
     layout = append(layout_hist, layout_rug)
     ls_shapes = get_shapes(trace_hist)
@@ -508,7 +572,7 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
     map_curve = ls_map$map_curve
     map_type = ls_map$map_type
     map_color = ls_map$map_color
-    
+
   }else{
     trace_hist = list()
     traces = list(parcats = parcats)
@@ -518,6 +582,43 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
     map_curve = list()
     map_type = list()
     map_color = list()
+  }
+  
+  if(imp){
+    traces = append(traces, traces_imp)
+    layout_imp = list( yaxis99 = list( domain = c(0,1)
+                                       , anchor = 'y99' 
+                                       , showticklabels = F
+                                       )
+                       , xaxis99 = list(domain = c(offset_imp,1)
+                                        , anchor = 'x99' 
+                                        , showticklabels = F
+                                        ) ) 
+    layout = append(layout, layout_imp)
+    
+    # we cannot move the axis labels to display inside the plot
+    # so we use annotations instead
+    
+    annotations = list()
+    
+    p_imp = plot_imp(p, data_input)
+    
+    max_perc = p_imp$data$perc %>% max()
+    
+    for( i in seq(1, length(traces_imp) ) ){
+      l = list( xref = 'x99'
+            , yref = 'y99'
+            , x = max_perc # traces_imp[[1]]$x[[1]]
+            , y = traces_imp[[i]]$y[[1]]
+            , showarrow = FALSE
+            , text = traces_imp[[i]]$y[[1]]
+            , align = 'right'
+            )
+      
+      annotations[[i]] = l
+    }
+    
+    layout$annotations = annotations
     
   }
   
@@ -532,6 +633,7 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
             , map_type = map_type %>% unname()
             , map_color = map_color %>% unname()
             , parcats_cols = parcats$line$color
+            , imp = imp
             )
   
   # create widget
