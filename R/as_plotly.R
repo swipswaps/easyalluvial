@@ -188,7 +188,7 @@ trace_hist_num = function(p, data_input, var){
   
   df = df %>%
     group_by(fill) %>%
-    nest() %>%
+    tidyr::nest() %>%
     mutate(trace = map2(data, fill, function(x,y) list( x = x$x
                                      , y = x$y
                                      , fillcolor = x$fill_value[1]
@@ -314,7 +314,13 @@ trace_parcats = function(p
                          , domain
                          , hoveron
                          , hoverinfo
-                         , labelfont){
+                         # , hovertemplate
+                         , arrangement
+                         , bundlecolors
+                         , sortpaths
+                         , labelfont
+                         , tickfont
+                         ){
   
   if(p$alluvial_type == 'model_response'){
     df = p$data %>%
@@ -370,7 +376,11 @@ trace_parcats = function(p
     , hoveron = hoveron
     , hoverinfo = hoverinfo
     , labelfont = labelfont
-    # , arrangement = 'freeform'
+    # , hovertemplate = hovertemplate
+    , arrangement = arrangement
+    , bundlecolors = bundlecolors
+    , sortpaths = sortpaths
+    , tickfont = tickfont
     , domain = domain )
 
 }
@@ -469,7 +479,7 @@ map_trace = function(p, trace_hist){
            ) %>%
     select(alluvial_id, trace_number, type, color) %>%
     group_by(alluvial_id) %>%
-    nest() %>%
+    tidyr::nest() %>%
     ungroup() %>%
     mutate(trace_number = map(data, 'trace_number')
            , type = map(data, 'type')
@@ -511,19 +521,84 @@ get_shapes = function(traces){
   return(ls_shapes)
 }
 
-#' <Add Title>
+#'@title create plotly parallel categories diagram from alluvial plot
+#'@description creates an interacit parallel categories diagram from an alluvial
+#'  plot using the plotly.js library
+#'@param p alluvial plot
+#'@param marginal_histograms logical, add marginal histograms, Default: T
+#'@param data_input dataframe, data used to create alluvial plot, Default: NULL
+#'@param imp dataframe, with not more then two columns one of them numeric
+#'  containing importance measures and one character or factor column containing
+#'  corresponding variable names as found in training data.
+#'@param width integer, htmlwidget width in pixels, Default: NULL
+#'@param height integer, htmlwidget height in pixels, Default: NULL
+#'@param elementId , htmlwidget elementid, Default: NULL
+#'@param hoveron character, one of c('category', 'color', 'dimension'), Sets the
+#'  hover interaction mode for the parcats diagram.', 'If `category`, hover
+#'  interaction take place per category.', 'If `color`, hover interactions take
+#'  place per color per category.', 'If `dimension`, hover interactions take
+#'  place across all categories per dimension., Default: 'color'
+#'@param hoverinfo character, one of c('count', 'probability',
+#'  'count+probability') set infor displayed on mouse hover Default:
+#'  'count+probability'
+#'@param arrangement, character, one of c('perpendicular', 'freeform', 'fixed')
+#'  'Sets the drag interaction mode for categories and dimensions.', 'If
+#'  `perpendicular`, the categories can only move along a line perpendicular to
+#'  the paths.', 'If `freeform`, the categories can freely move on the plane.',
+#'  'If `fixed`, the categories and dimensions are stationary.', Default:
+#'  'perpendicular'
+#'@param bundlecolors logical, 'Sort paths so that like colors are bundled
+#'  together within each category.', Default: TRUE
+#'@param sortpaths character, one of c('forward', 'backward'), 'Sets the path
+#'  sorting algorithm.', 'If `forward`, sort paths based on dimension categories
+#'  from left to right.', Default: 'forward' 'If `backward`, sort paths based on
+#'  dimensions categories from right to left.'
+#'@param labelfont list, 'Sets the font for the `dimension` labels.', Default:
+#'  list(size = 24, color = 'black')
+#'@param tickfont list, Sets the font for the `category` labels.', Default: NULL
+#'@param offset_marginal_histograms double, height ratio reserved for parcats
+#'  diagram, Default: 0.8
+#'@param offset_imp double, width ratio reserved for parcats diagram, Default:
+#'  0.9
+#'@return htmlwidget
+#'@details most parameters are best left at default values
+#' @examples
 #'
-#' <Add Description>
+#' # alluvial wide ---------------------------------
+#' p = alluvial_wide(mtcars2, max_variables = 5)
 #'
-#' @import htmlwidgets
+#' alluvial_as_plotly(p, marginal_histograms = F)
 #'
-#' @export
+#' alluvial_as_plotly(p, marginal_histograms = T, data_input = mtcars2)
+#'
+#' # alluvial for model response --------------------
+#' df = mtcars2[, ! names(mtcars2) %in% 'ids' ]
+#' m = randomForest::randomForest( disp ~ ., df)
+#' imp = m$importance
+#' dspace = get_data_space(df, imp, degree = 3)
+#' pred = predict(m, newdata = dspace)
+#' p = alluvial_model_response(pred, dspace, imp, degree = 3)
+#'
+#' alluvial_as_plotly(p, marginal_histograms = T, imp = T, data_input = df)
+#'
+#'
+#'@seealso \code{\link[htmlwidgets]{createWidget}}
+#'@rdname alluvial_as_plotly
+#'@export
+#'@importFrom htmlwidgets createWidget
+#'@importFrom tidyr nest uncount
+#'@importFrom stringr str_extract
 alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
                                , imp = T
                                , width = NULL, height = NULL, elementId = NULL
                                , hoveron = 'color'
                                , hoverinfo = 'count+probability'
-                               , labelfont = list( size = 36 )
+                               # , hovertemplate = NULL
+                               , arrangement = 'perpendicular'
+                               , bundlecolors = TRUE
+                               , sortpaths = 'forward'
+                               , labelfont = list( size = 24, color = 'black' )
+                               , tickfont = NULL
                                , offset_marginal_histograms = 0.8
                                , offset_imp = 0.9
                                ) {
@@ -555,7 +630,13 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
   parcats = trace_parcats(p, domain = domain
                           , hoveron = hoveron
                           , hoverinfo = hoverinfo
-                          , labelfont = list( size = 36) )
+                          # , hovertemplate = hovertemplate
+                          , arrangement = arrangement
+                          , bundlecolors = bundlecolors
+                          , sortpaths = sortpaths
+                          , labelfont = labelfont
+                          , tickfont = tickfont
+                          )
   
   if(marginal_histograms){
     trace_hist = trace_hist_all(p, data_input)
@@ -664,8 +745,14 @@ alluvial_as_plotly <- function(p, marginal_histograms = T, data_input = NULL
 #' @name alluvial_as_plotly-shiny
 #'
 #' @export
-alluvial_as_plotlyOutput <- function(outputId, width = '100%', height = '400px'){
-  htmlwidgets::shinyWidgetOutput(outputId, 'alluvial_as_plotly', width, height, package = 'easyalluvial')
+alluvial_as_plotlyOutput <- function(outputId, width = '100%', height = '100%', inline = F){
+  htmlwidgets::shinyWidgetOutput(outputId
+                                 , 'alluvial_as_plotly'
+                                 , width
+                                 , height
+                                 , package = 'easyalluvial'
+                                 , inline = inline
+                                 , reportSize = T)
 }
 
 #' @rdname alluvial_as_plotly-shiny

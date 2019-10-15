@@ -20,6 +20,7 @@ test_that('as_plotly_alluvial_wide'
 
 })
 
+
 test_that('as_plotly_alluvial_wide_num_only'
           ,{
             
@@ -32,8 +33,50 @@ test_that('as_plotly_alluvial_wide_num_only'
     
 })
 
+test_that('parcats_params',{
+  
+  p = alluvial_wide(mtcars2, max_variables = 5)
+  
+  # hoveron
+  alluvial_as_plotly(p, hoveron = 'category', marginal_histograms = T, data_input = mtcars2)
+  alluvial_as_plotly(p, hoveron = 'color', marginal_histograms = T, data_input = mtcars2)
+  alluvial_as_plotly(p, hoveron = 'dimension', marginal_histograms = T, data_input = mtcars2)
+  
+  #hoverinfo
+  alluvial_as_plotly(p, hoverinfo = 'count', marginal_histograms = F)
+  alluvial_as_plotly(p, hoverinfo = 'probability', marginal_histograms = F)
+  alluvial_as_plotly(p, hoveron = 'count+probability', marginal_histograms = F)
+  
+  # hovertemplate probably needs some kind of format string, too complicated will drop this
+  # alluvial_as_plotly(p, hovertemplate = 'count', marginal_histograms = F)
+  # alluvial_as_plotly(p, hovertemplate = 'probability', marginal_histograms = F)
+  # alluvial_as_plotly(p, hovertemplate = 'category', marginal_histograms = F)
+  # alluvial_as_plotly(p, hovertemplate = 'categorycount', marginal_histograms = F)
+  # alluvial_as_plotly(p, hovertemplate = 'colorcount', marginal_histograms = F)
+  # alluvial_as_plotly(p, hovertemplate = 'bandcolorcount', marginal_histograms = F)
+  
+  # arrangement
+  alluvial_as_plotly(p, arrangement = 'fixed', marginal_histograms = F)
+  alluvial_as_plotly(p, arrangement = 'perpendicular', marginal_histograms = F)
+  alluvial_as_plotly(p, arrangement = 'freeform', marginal_histograms = F)
+  
+  #bundlecolors
+  alluvial_as_plotly(p, bundlecolors = T, marginal_histograms = F)
+  alluvial_as_plotly(p, bundlecolors = F, marginal_histograms = F)
+  
+  #sortpaths
+  alluvial_as_plotly(p, sortpaths = 'forward', marginal_histograms = F)
+  alluvial_as_plotly(p, sortpaths = 'backward', marginal_histograms = F)
+  
+  #labelfont
+  alluvial_as_plotly(p, labelfont = list(size = 18, color = 'blue'), marginal_histograms = F)
+  
+  #tickfont
+  alluvial_as_plotly(p, tickfont = list(size = 18, color = 'blue'), marginal_histograms = F)
+  
+})
 
-test_that('as_plotly_alluvial_wide'
+test_that('as_plotly_alluvial_long'
           ,{
             
     p = alluvial_long(quarterly_flights, key = qu, value = mean_arr_delay, id = tailnum)
@@ -91,9 +134,12 @@ test_that('as_plotly_alluvial_model_response'
     
     alluvial_as_plotly(p, marginal_histograms = F, imp = F)
     
-    alluvial_as_plotly(p, marginal_histograms = T, imp = F, data_input = df)
-    
-    alluvial_as_plotly(p, marginal_histograms = T, imp = T, data_input = df)
+    suppressWarnings({
+      # warning is raised because number of factors is cut to 5
+      alluvial_as_plotly(p, marginal_histograms = T, imp = F, data_input = df)
+      
+      alluvial_as_plotly(p, marginal_histograms = T, imp = T, data_input = df)
+    })
     
     # grid = add_marginal_histograms(p, df)
     

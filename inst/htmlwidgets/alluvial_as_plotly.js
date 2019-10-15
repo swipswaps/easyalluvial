@@ -100,7 +100,10 @@ HTMLWidgets.widget({
       , t3 = x.map_type[t2]
       , t4 = x.map_curve[t2]
       ;
+      
+      // use first title option for debugging
       var title = t1 + '_' + t2 + '_' + t3 + '_' + t4 + '_' + x.map_trace_2_shape[12]+ '_' + x.map_trace_2_shape[15];
+      var title = '';
 
       if(curve == 0){
         Plotly.relayout(el.id, { shapes : shapes
